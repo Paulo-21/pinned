@@ -115,10 +115,10 @@ static ANTIDIAG_MASKS : [u64;15] = [
 	0x8040201008040201, 0x4020100804020100, 0x2010080402010000, 0x1008040201000000,
 	0x804020100000000, 0x402010000000000, 0x201000000000000, 0x100000000000000
 ];
-static m1  :u64 = (-1i64) as u64;
-static a2a7:u64 = (0x0001010101010100i64) as u64;
-static b2g7:u64 = (0x0040201008040200i64) as u64;
-static h1b7:u64 = (0x0002040810204080i64) as u64;
+static m1  :u64 = 0u64.wrapping_sub(1);
+static a2a7:u64 = 0x0001010101010100u64;
+static b2g7:u64 = 0x0040201008040200u64;
+static h1b7:u64 = 0x0002040810204080u64;
 //pub static SQUARE_CENTER : u64 = 103481868288;
 pub static SQUARE_CENTER : u64 = 0x1818000000;
 
@@ -160,12 +160,20 @@ lazy_static! {
         }
         knight_moves
     };
-
     pub static ref REC_TABLE : [[u64;64];64] = {
         let mut rec = [[0u64;64];64];
-        for i in 1..64 {
-            for k in 1..64 {
-                rec[i][k] = inBetween(i as u64, k as u64);
+        for sq1 in 0..64 {
+            for sq2 in  0..64 {
+                let occ =  (1<<sq1) | (1<<sq2);
+                if file_of(sq1) == file_of(sq2) || rank_of(sq1) == rank_of(sq2) {
+                    rec[sq1 as usize][sq2 as usize] =
+                    hv_moves(sq1, occ) & hv_moves(sq2, occ);
+                }
+                else if diagonal_of(sq1) == diagonal_of(sq2) || anti_diagonal_of(sq1) == anti_diagonal_of(sq2) {
+                    rec[sq1 as usize][sq2 as usize] =
+                    diag_antid_moves(sq1, occ) & diag_antid_moves(sq2, occ);
+                }
+                //_draw_bitboard(rec[sq1 as usize][sq2 as usize]);
             }
         }
         rec
@@ -224,6 +232,11 @@ pub fn draw_the_game_state(game : &Game) {
     eprintln!("BKING");
     _draw_bitboard(game.bk);
 }
+
+const fn rank_of(s : u64) -> u64 { s >> 3 }
+const fn file_of(s : u64) -> u64 { s & 0b111 }
+const fn diagonal_of(s : u64) -> u64 { return 7 + rank_of(s) - file_of(s); }
+const fn anti_diagonal_of(s : u64) -> u64 { return rank_of(s) + file_of(s); }
 pub fn get_game_from_basicpos() -> Game {
     let mut wp : u64 = 0;
     let mut wn : u64 = 0;
@@ -314,17 +327,30 @@ pub fn convert_string_to_bitboard(binary:usize) -> u64 {
     //u64::pow(2, (binary) as u32)
     1<<binary
 }
-fn inBetween( sq1 : u64, sq2 : u64) -> u64 {
+//#![feature(unchecked_math)]
+pub fn in_between( sq1 : u64, sq2 : u64) -> u64 {
     /* Thanks Dustin, g2b7 did not work for c1-a3 */
-   
+   //unsafe {
+   /*
+   let btwn  = (m1 << sq1) ^ (m1 << sq2);
+   let file  =   (sq2 & 7).wrapping_sub(sq1   & 7);
+   let rank  =  ((sq2 | 7).wrapping_sub(sq1)) >> 3 ;
+   let mut line  = (   (file  &  7).wrapping_sub(1)) & a2a7; /* a2a7 if same file */
+   line +=  ((   (rank  &  7).wrapping_sub(1)) >> 58).wrapping_mul(2) <<1; /* b1g1 if same rank */
+   line += (((rank.wrapping_sub(file)) & 15).wrapping_sub(1)) & b2g7; /* b2g7 if same diagonal */
+   line += (((rank.wrapping_add(file)) & 15).wrapping_sub(1)) & h1b7; /* h1b7 if same antidiag */
+   line = line.wrapping_mul(btwn & (btwn ^ 1<<63)); /* mul acts like shift by smaller square */
+   //}
+   */
    let btwn  = (m1 << sq1) ^ (m1 << sq2);
    let file  =   (sq2 & 7) - (sq1   & 7);
    let rank  =  ((sq2 | 7) -  sq1) >> 3 ;
-   let mut line  = (   (file  &  7) -1) & a2a7; /* a2a7 if same file */
-   line += 2 * ((   (rank  &  7) - 1) >> 58) <<1; /* b1g1 if same rank */
+   let mut line  =      (   (file  &  7) - 1) & a2a7; /* a2a7 if same file */
+   line += 2 * ((   (rank  &  7) - 1) >> 58); /* b1g1 if same rank */
    line += (((rank - file) & 15) - 1) & b2g7; /* b2g7 if same diagonal */
    line += (((rank + file) & 15) - 1) & h1b7; /* h1b7 if same antidiag */
-   line *= btwn & (btwn-1); /* mul acts like shift by smaller square */
+   line *= btwn & (btwn ^ 1<<63); /* mul acts like shift by smaller square */
+   
    return line & btwn;   /* return the bits on that line in-between */
 }
 pub fn get_pinned_b(game : &Game) -> u64 {
@@ -371,6 +397,62 @@ pub fn get_pinned_w(game : &Game) -> u64 {
     }
     pinned
 }
+
+pub fn get_checked_mask_b(game : &Game) -> u64 {
+    let mut checked_mask = 0xFFFFFFFFFFFFFFFF;
+    _draw_bitboard(checked_mask);
+    let black = game.black();
+    let white = game.white();
+    let occupied = black | white;
+    let k = game.bk;
+    let mut pawns = game.wp;
+    while pawns != 0 {
+        let p = pawns.tzcnt();
+        let m = attack_wp(game.wp, black);
+        if m & k != 0 {
+            checked_mask &= p;
+        }
+        pawns = pawns.blsr();
+    }
+    let mut kn = game.wn;
+    while kn != 0 {
+        let p = kn.tzcnt();
+        let m = KNIGHT_MOVE[p as usize];
+        if m & k != 0 {
+            checked_mask &= p;
+        }
+        kn = kn.blsr();
+    }
+    let mut copy_wb = game.wb;
+
+    while copy_wb != 0 {
+        let attack = diag_antid_moves(copy_wb.tzcnt() , occupied) & !white;
+        if attack & k != 0 {
+            checked_mask &= REC_TABLE[copy_wb.tzcnt() as usize][k.tzcnt()  as usize]
+        }
+        copy_wb &= copy_wb-1;
+    }
+    let mut copy_br = game.wr;
+    while copy_br != 0 {
+        let attack = hv_moves(copy_br.tzcnt(), occupied) & !white;
+        if attack & k != 0 {
+            checked_mask &= REC_TABLE[copy_br.tzcnt()  as usize][k.tzcnt()  as usize]
+        }
+        copy_br &= copy_br-1;
+    }
+    let mut copy_bq = game.wq;
+    while copy_bq != 0 {
+        let attack = (hv_moves(copy_bq.tzcnt(), occupied) | diag_antid_moves(copy_bq.tzcnt(), occupied) ) & !black;
+        if attack & k != 0 {
+            checked_mask &= REC_TABLE[copy_bq.tzcnt()  as usize][k.tzcnt()  as usize]
+        }
+        copy_bq &= copy_bq-1;
+    }
+
+    
+
+    checked_mask
+}
 fn xrayRookAttacks(occ : u64, mut blockers : u64, rookSq : u64) -> u64 {
    let attacks : u64 = hv_moves(rookSq, occ);
    blockers &= attacks;
@@ -396,9 +478,9 @@ pub fn possibility_bp2( bpawn: u64, empty : u64, white : u64) -> u64 {
     let pmoves4 = bpawn>>16 & empty & (empty>>8) & RANK_MASK[4];
     pmoves1 | pmoves2 | pmoves3 | pmoves4
 }
-pub fn attack_wp(wpawn : u64, white : u64) -> u64 {
-    let pmoves1 = wpawn<<7 & white;// & !FILE_MASKS[0];
-    let pmoves2 = wpawn<<9 & white;// & !FILE_MASKS[7];
+pub fn attack_wp(wpawn : u64, black : u64) -> u64 {
+    let pmoves1 = wpawn<<7 & black;// & !FILE_MASKS[0];
+    let pmoves2 = wpawn<<9 & black;// & !FILE_MASKS[7];
     pmoves1 | pmoves2
 }
 pub fn attack_bp(bpawn : u64, black : u64) -> u64 {

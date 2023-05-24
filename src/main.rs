@@ -2,15 +2,17 @@ mod chess;
 mod zobrist;
 use chess::*;
 use zobrist::*;
+
+
+
 fn main() {
     //let game = Game::default();
     let fen = "position fen 8/4k3/4b3/8/1B6/8/4R3/8 w - - 0 1";
     let game = get_bitboard_from_fen(fen.trim().split_ascii_whitespace().collect());
-    let  a = get_pinned_b(&game);
-    _draw_bitboard(a);
-    
+    //let  a = get_pinned_b(&game);
+    let a = get_checked_mask_b(&game);
+    _draw_bitboard(a);   
 }
-
 pub fn get_bitboard_from_fen(fen : Vec<&str>) -> Game {
     let mut game = Game::empty();
     let board = fen[2];
