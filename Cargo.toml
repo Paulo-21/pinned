@@ -9,3 +9,12 @@ edition = "2021"
 bitintr = "0.3.0"
 lazy_static = "1.4.0"
 rand = "0.8.5"
+rand_xorshift = "0.3.0"
+
+[profile.release]
+lto = true
+codegen-units = 1
+#strip="none"
+
+[profile.dev]
+overflow-checks = false

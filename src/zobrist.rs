@@ -71,14 +71,12 @@ lazy_static! {
     };
 }
 
-
 impl Game {
     pub fn as_array(&self) -> [u64; 12] {
         [self.wp, self.wn, self.wb, self.wr, self.wq, self.wk, self.bp, self.bn, self.bb, self.br, self.bq, self.bk]
     }
-    pub fn castling_as_array(&self) -> [bool; 6] {
-        [self.wking_never_move, self.wqueen_rook_never_move, self.wking_rook_never_move,
-         self.bking_never_move, self.bqueen_rook_never_move, self.bking_rook_never_move]
+    pub fn castling_as_array(&self) -> [bool; 4] {
+        [self.wqueen_castle, self.wking_castle, self.bqueen_castle, self.bking_castle]
     }
 }
 pub fn init_zobrist_key(game : &Game
