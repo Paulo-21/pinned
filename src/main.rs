@@ -5,7 +5,7 @@ use zobrist::*;
 
 fn main() {
     //let game = Game::default();
-    let fen = "position fen 8/k5P1/8/8/8/8/8/1K6 w - - 0 1";
+    let fen = "position fen r3kb1r/pppb1ppp/2nqpn2/1B4Q1/3P4/2N2N2/PPP2PPP/R1B1K2R b KQkq - 2 9";
     let game = get_bitboard_from_fen(fen.trim().split_ascii_whitespace().collect());
     //let a = get_pinned_mask_b(&game);
     //let  a = get_pinned_b(&game);
