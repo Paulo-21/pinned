@@ -81,7 +81,7 @@ impl Default for Game {
     }
 }
 
-pub fn convert_square_to_move(a_move : u64) -> String{
+pub fn convert_square_to_move(a_move : u64) -> String {
     let b = (a_move / 8) as u8;
     let a:u8 = (a_move % 8) as u8;
     let f = (b'a' + a ) as char;
@@ -115,12 +115,8 @@ static ANTIDIAG_MASKS : [u64;15] = [
 	0x8040201008040201, 0x4020100804020100, 0x2010080402010000, 0x1008040201000000,
 	0x804020100000000, 0x402010000000000, 0x201000000000000, 0x100000000000000
 ];
-static m1  :u64 = 0u64.wrapping_sub(1);
-static a2a7:u64 = 0x0001010101010100u64;
-static b2g7:u64 = 0x0040201008040200u64;
-static h1b7:u64 = 0x0002040810204080u64;
 //pub static SQUARE_CENTER : u64 = 103481868288;
-pub static SQUARE_CENTER : u64 = 0x1818000000;
+pub static _SQUARE_CENTER : u64 = 0x1818000000;
 
 lazy_static! {
     static ref FIRST_RANK_ATTACKS: [[u64; 8]; 64] = {
@@ -205,7 +201,7 @@ pub fn array_to_bitboard(chessboard : [[char;8]; 8], wp:&mut u64, wn:&mut u64, w
         }
     }
 }
-pub fn draw_the_game_state(game : &Game) {
+pub fn _draw_the_game_state(game : &Game) {
     eprintln!("GAME STATE");
     eprintln!("WPAWN");
     _draw_bitboard(game.wp);
@@ -327,117 +323,91 @@ pub fn convert_string_to_bitboard(binary:usize) -> u64 {
     //u64::pow(2, (binary) as u32)
     1<<binary
 }
-//#![feature(unchecked_math)]
-pub fn _in_between( sq1 : u64, sq2 : u64) -> u64 {
-    /* Thanks Dustin, g2b7 did not work for c1-a3 */
-   //unsafe {
-   /*
-   let btwn  = (m1 << sq1) ^ (m1 << sq2);
-   let file  =   (sq2 & 7).wrapping_sub(sq1   & 7);
-   let rank  =  ((sq2 | 7).wrapping_sub(sq1)) >> 3 ;
-   let mut line  = (   (file  &  7).wrapping_sub(1)) & a2a7; /* a2a7 if same file */
-   line +=  ((   (rank  &  7).wrapping_sub(1)) >> 58).wrapping_mul(2) <<1; /* b1g1 if same rank */
-   line += (((rank.wrapping_sub(file)) & 15).wrapping_sub(1)) & b2g7; /* b2g7 if same diagonal */
-   line += (((rank.wrapping_add(file)) & 15).wrapping_sub(1)) & h1b7; /* h1b7 if same antidiag */
-   line = line.wrapping_mul(btwn & (btwn ^ 1<<63)); /* mul acts like shift by smaller square */
-   //}
-   */
-   let btwn  = (m1 << sq1) ^ (m1 << sq2);
-   let file  =   (sq2 & 7) - (sq1   & 7);
-   let rank  =  ((sq2 | 7) -  sq1) >> 3 ;
-   let mut line  =      (   (file  &  7) - 1) & a2a7; /* a2a7 if same file */
-   line += 2 * ((   (rank  &  7) - 1) >> 58); /* b1g1 if same rank */
-   line += (((rank - file) & 15) - 1) & b2g7; /* b2g7 if same diagonal */
-   line += (((rank + file) & 15) - 1) & h1b7; /* h1b7 if same antidiag */
-   line *= btwn & (btwn ^ 1<<63); /* mul acts like shift by smaller square */
-   
-   return line & btwn;   /* return the bits on that line in-between */
-}
 pub fn _get_pinned_b(game : &Game) -> u64 {
-    let occupiedBB = game.occupied();
-    let ownPieces = game.black();
-    let squareOfKing = game.bk.tzcnt();
+    let occupied_bb = game.occupied();
+    let own_pieces = game.black();
+    let square_of_king = game.bk.tzcnt();
     let mut pinned = 0;
-    let mut pinner = xrayRookAttacks(occupiedBB, ownPieces, squareOfKing) & (game.wr | game.wq);
+    let mut pinner = xray_rook_attacks(occupied_bb, own_pieces, square_of_king) & (game.wr | game.wq);
     //_draw_bitboard(pinner);
     while pinner != 0 {
         let sq  = pinner.tzcnt();
-        pinned |= REC_TABLE[sq  as usize][squareOfKing  as usize] & ownPieces;
+        pinned |= REC_TABLE[sq  as usize][square_of_king  as usize] & own_pieces;
         pinner = pinner.blsr();
     }
-    pinner = xrayBishopAttacks(occupiedBB, ownPieces, squareOfKing) & (game.wb | game.wq);
+    pinner = xray_bishop_attacks(occupied_bb, own_pieces, square_of_king) & (game.wb | game.wq);
     while pinner != 0 {
         let sq  = pinner.tzcnt();
-        pinned |= REC_TABLE[sq  as usize][squareOfKing  as usize] & ownPieces;
+        pinned |= REC_TABLE[sq  as usize][square_of_king  as usize] & own_pieces;
         pinner = pinner.blsr();
     }
     pinned
 }
 pub fn get_pinned_mask_b(game : &Game) -> (u64,u64) {
-    let occupiedBB = game.occupied();
-    let ownPieces = game.black();
-    let squareOfKing = game.bk.tzcnt();
-    let mut pinned = 0;
+    let occupied_bb = game.occupied();
+    let own_pieces = game.black();
+    let square_of_king = game.bk.tzcnt();
+    //let mut pinned = 0;
     let mut pinned_mask_hv = 0;
     let mut pinned_mask_d12 = 0;
-    let mut pinner = xrayRookAttacks(occupiedBB, ownPieces, squareOfKing) & (game.wr | game.wq);
+    let mut pinner = xray_rook_attacks(occupied_bb, own_pieces, square_of_king) & (game.wr | game.wq);
     //_draw_bitboard(pinner);
     while pinner != 0 {
         let sq  = pinner.tzcnt();
-        pinned |= REC_TABLE[sq  as usize][squareOfKing  as usize] & ownPieces;
-        pinned_mask_hv |= REC_TABLE[sq  as usize][squareOfKing  as usize] | (1<<sq);
+        //pinned |= REC_TABLE[sq  as usize][square_of_king  as usize] & own_pieces;
+        pinned_mask_hv |= REC_TABLE[sq  as usize][square_of_king  as usize] | (1<<sq);
         pinner = pinner.blsr();
     }
-    pinner = xrayBishopAttacks(occupiedBB, ownPieces, squareOfKing) & (game.wb | game.wq);
+    pinner = xray_bishop_attacks(occupied_bb, own_pieces, square_of_king) & (game.wb | game.wq);
     while pinner != 0 {
         let sq  = pinner.tzcnt();
-        pinned |= REC_TABLE[sq  as usize][squareOfKing  as usize] & ownPieces;
-        pinned_mask_d12 |= REC_TABLE[sq  as usize][squareOfKing  as usize] | (1<<sq);
+        //pinned |= REC_TABLE[sq  as usize][square_of_king  as usize] & own_pieces;
+        pinned_mask_d12 |= REC_TABLE[sq  as usize][square_of_king  as usize] | (1<<sq);
         pinner = pinner.blsr();
     }
     (pinned_mask_hv, pinned_mask_d12)
 }
 
 pub fn _get_pinned_w(game : &Game) -> u64 {
-    let occupiedBB = game.occupied();
-    let ownPieces = game.white();
-    let squareOfKing = game.wk.tzcnt();
+    let occupied_bb = game.occupied();
+    let own_pieces = game.white();
+    let square_of_king = game.wk.tzcnt();
     let mut pinned = 0;
-    let mut pinner = xrayRookAttacks(occupiedBB, ownPieces, squareOfKing) & (game.br | game.bq);
+    let mut pinner = xray_rook_attacks(occupied_bb, own_pieces, square_of_king) & (game.br | game.bq);
     //_draw_bitboard(pinner);
     while pinner != 0 {
         let sq  = pinner.tzcnt();
-        pinned |= REC_TABLE[sq  as usize][squareOfKing  as usize] & ownPieces;
+        pinned |= REC_TABLE[sq  as usize][square_of_king  as usize] & own_pieces;
         pinner = pinner.blsr();
     }
-    pinner = xrayBishopAttacks(occupiedBB, ownPieces, squareOfKing) & (game.bb | game.bq);
+    pinner = xray_bishop_attacks(occupied_bb, own_pieces, square_of_king) & (game.bb | game.bq);
     while pinner != 0 {
         let sq  = pinner.tzcnt();
-        pinned |= REC_TABLE[sq  as usize][squareOfKing  as usize] & ownPieces;
+        pinned |= REC_TABLE[sq  as usize][square_of_king  as usize] & own_pieces;
         pinner = pinner.blsr();
     }
     pinned
 }
 pub fn get_pinned_mask_w(game : &Game) -> (u64,u64) {
-    let occupiedBB = game.occupied();
-    let ownPieces = game.white();
-    let squareOfKing = game.wk.tzcnt();
+    let occupied_bb = game.occupied();
+    let own_pieces = game.white();
+    let square_of_king = game.wk.tzcnt();
     let mut pinned_mask_hv = 0;
     let mut pinned_mask_d12 = 0;
     //let mut pinned = 0;
-    let mut pinner = xrayRookAttacks(occupiedBB, ownPieces, squareOfKing) & (game.br | game.bq);
+    let mut pinner = xray_rook_attacks(occupied_bb, own_pieces, square_of_king) & (game.br | game.bq);
     //_draw_bitboard(pinner);
     while pinner != 0 {
         let sq  = pinner.tzcnt();
-        //pinned |= REC_TABLE[sq  as usize][squareOfKing  as usize] & ownPieces;
-        pinned_mask_hv |= REC_TABLE[sq  as usize][squareOfKing  as usize] & (1<<sq);
+        //pinned |= REC_TABLE[sq  as usize][square_of_king  as usize] & own_pieces;
+        pinned_mask_hv |= REC_TABLE[sq  as usize][square_of_king  as usize] & (1<<sq);
         pinner = pinner.blsr();
     }
-    pinner = xrayBishopAttacks(occupiedBB, ownPieces, squareOfKing) & (game.bb | game.bq);
+    pinner = xray_bishop_attacks(occupied_bb, own_pieces, square_of_king) & (game.bb | game.bq);
     while pinner != 0 {
         let sq  = pinner.tzcnt();
-        //pinned |= REC_TABLE[sq  as usize][squareOfKing  as usize] & ownPieces;
-        pinned_mask_d12 |= REC_TABLE[sq  as usize][squareOfKing  as usize] | (1<<sq);
+        //pinned |= REC_TABLE[sq  as usize][square_of_king  as usize] & own_pieces;
+        pinned_mask_d12 |= REC_TABLE[sq  as usize][square_of_king  as usize] | (1<<sq);
         pinner = pinner.blsr();
     }
     (pinned_mask_hv, pinned_mask_d12)
@@ -494,7 +464,7 @@ pub fn get_checked_mask_b(game : &Game) -> u64 {
     }
     let mut copy_wq = game.wq;
     while copy_wq != 0 {
-        let attack = (hv_moves(copy_wq.tzcnt(), occupied) | diag_antid_moves(copy_wq.tzcnt(), occupied) );
+        let attack = hv_moves(copy_wq.tzcnt(), occupied) | diag_antid_moves(copy_wq.tzcnt(), occupied);
         if attack & k != 0 {
             if checked_mask != full {
                 return 0;
@@ -558,7 +528,7 @@ pub fn get_checked_mask_w(game : &Game) -> u64 {
     }
     let mut copy_wq = game.bq;
     while copy_wq != 0 {
-        let attack = (hv_moves(copy_wq.tzcnt(), occupied) | diag_antid_moves(copy_wq.tzcnt(), occupied) );
+        let attack = hv_moves(copy_wq.tzcnt(), occupied) | diag_antid_moves(copy_wq.tzcnt(), occupied);
         if attack & k != 0 {
             if checked_mask != full {
                 return 0;
@@ -581,11 +551,12 @@ pub fn get_legal_moves_fast(game : &Game) -> Vec<u64>{
         let checkmask = get_checked_mask_w(game);
         let (pin_hv, pin_d12) = get_pinned_mask_w(game);
         //PAWN
-        let mut p_at = (game.wp & !pin_hv & !FILE_MASKS[7]) & (black >> 7) & (checkmask>> 7);
-        let mut p_at2 = (game.wp & !pin_hv & !FILE_MASKS[0]) & (black >> 9 ) & (checkmask >> 9);
-        
-        let mut p_at3 = (game.wp &  !pin_hv & !pin_d12) & ((empty>>8) & (empty >> 16)) & RANK_MASK[1] & (checkmask >> 16);
-        let mut p_at4 = (game.wp & !pin_hv & !pin_d12) & (empty >> 8) & (checkmask >> 8);
+        let unpinned_wp = game.wp & !pin_hv;
+        let mut p_at = (unpinned_wp & !FILE_MASKS[0]) & (black >> 7) & (checkmask>> 7);
+        let mut p_at2 = (unpinned_wp & !FILE_MASKS[7]) & (black >> 9 ) & (checkmask >> 9);
+        //_draw_bitboard(!FILE_MASKS[7]);
+        let mut p_at3 = (unpinned_wp & !pin_d12) & ((empty>>8) & (empty >> 16)) & RANK_MASK[1] & (checkmask >> 16);
+        let mut p_at4 = (unpinned_wp & !pin_d12 & !RANK_MASK[6]) & (empty >> 8) & (checkmask >> 8);
         
         while p_at != 0 {
             let pi_square = p_at.tzcnt();
@@ -607,6 +578,25 @@ pub fn get_legal_moves_fast(game : &Game) -> Vec<u64>{
             legal_moves.push((pi_square <<9) + (((1<<pi_square)<<8).tzcnt()<<1) );
             p_at4 = p_at4.blsr();
         }
+        let mut prom1 = (unpinned_wp & !pin_d12 & RANK_MASK[6]) & (empty >> 8) & (checkmask >> 8);
+        let mut prom2 = (unpinned_wp & RANK_MASK[6] & !FILE_MASKS[0]) & (black >> 7) & (checkmask>> 7);
+        let mut prom3 = (unpinned_wp & RANK_MASK[6] &!FILE_MASKS[7]) & (black >> 9 ) & (checkmask >> 9);
+        while prom1 != 0 {
+            let pi_square = prom1.tzcnt();
+            legal_moves.push((pi_square <<9) + (((1<<pi_square)<<8).tzcnt()<<1)+1 );
+            prom1 = prom1.blsr();
+        }
+        while prom2 != 0 {
+            let pi_square = prom2.tzcnt();
+            legal_moves.push((pi_square <<9) | (((1<<pi_square)<<7).tzcnt()<<1)+1 );
+            prom2 = prom2.blsr();
+        }
+        while prom3 != 0 {
+            let pi_square = prom3.tzcnt();
+            legal_moves.push((pi_square <<9) + (((1<<pi_square)<<9).tzcnt()<<1)+1 );
+            prom3 = prom3.blsr();
+        }
+        
         //KNIGHT
         let mut copy = game.wn & !(pin_hv | pin_d12);
         while copy != 0 {
@@ -617,7 +607,6 @@ pub fn get_legal_moves_fast(game : &Game) -> Vec<u64>{
             }
             copy = copy.blsr();
         }
-
         //BISHOP
         let mut p = game.wb & !(pin_hv | pin_d12);
         let mut p1 = game.wb & pin_d12;
@@ -686,7 +675,7 @@ pub fn get_legal_moves_fast(game : &Game) -> Vec<u64>{
         }
         //KING
         let possib = possibility_b(game);
-        let mut p = KING_MOVE[game.wk.tzcnt() as usize] & !possib & !white;// & !pin_hv & !pin_d12;
+        let mut p = KING_MOVE[game.wk.tzcnt() as usize] & !possib & !white & checkmask;// & !pin_hv & !pin_d12;
         while p != 0 {
             legal_moves.push((game.wk.tzcnt() <<9) + (p.tzcnt()<<1) );
             p = p.blsr();
@@ -704,10 +693,11 @@ pub fn get_legal_moves_fast(game : &Game) -> Vec<u64>{
         let (pin_hv, pin_d12) = get_pinned_mask_b(game);
         //_draw_bitboard(black);
         //PAWN
-        let mut p_at  = ((game.bp & !pin_hv  & !FILE_MASKS[7])) & (white << 7) & (checkmask << 7);
-        let mut p_at2 = ((game.bp & !pin_hv & !FILE_MASKS[0])) & (white << 9 ) & (checkmask << 9);
-        let mut p_at3 = (game.bp & !pin_hv & !pin_d12 ) & ( (empty << 16)&(empty << 8)) & RANK_MASK[6] & (checkmask <<16);
-        let mut p_at4 = (game.bp & !pin_hv & !pin_d12) & ( (empty << 8)) & (checkmask<<8);
+        let unpinned_bp = game.bp & !pin_hv;
+        let mut p_at  = ((unpinned_bp & !FILE_MASKS[7])) & (white << 7) & (checkmask << 7);
+        let mut p_at2 = ((unpinned_bp & !FILE_MASKS[0])) & (white << 9 ) & (checkmask << 9);
+        let mut p_at3 = (unpinned_bp & !pin_d12 ) & ( (empty << 16)&(empty << 8)) & RANK_MASK[6] & (checkmask <<16);
+        let mut p_at4 = (unpinned_bp & !pin_d12) & ( (empty << 8)) & (checkmask<<8) ;
         
         while p_at != 0 {
             let pi_square = p_at.tzcnt();
@@ -809,7 +799,7 @@ pub fn get_legal_moves_fast(game : &Game) -> Vec<u64>{
         }
         //KING
         let possiw = possibility_w(game);
-        let mut p = KING_MOVE[game.bk.tzcnt() as usize] & !possiw & !black & !pin_hv & !pin_d12;
+        let mut p = KING_MOVE[game.bk.tzcnt() as usize] & !possiw & !black & checkmask;
         while p != 0 {
             legal_moves.push((game.bk.tzcnt() <<9) + (p.tzcnt()<<1) );
             p = p.blsr();
@@ -824,15 +814,15 @@ pub fn get_legal_moves_fast(game : &Game) -> Vec<u64>{
     legal_moves
 }
 
-fn xrayRookAttacks(occ : u64, mut blockers : u64, rookSq : u64) -> u64 {
-   let attacks : u64 = hv_moves(rookSq, occ);
+fn xray_rook_attacks(occ : u64, mut blockers : u64, rook_sq : u64) -> u64 {
+   let attacks : u64 = hv_moves(rook_sq, occ);
    blockers &= attacks;
-   return attacks ^ hv_moves(rookSq, occ ^ blockers);
+   return attacks ^ hv_moves(rook_sq, occ ^ blockers);
 }
-fn xrayBishopAttacks(occ : u64, mut blockers : u64, bishopSq : u64) -> u64 {
-   let attacks : u64 = diag_antid_moves(bishopSq, occ);
+fn xray_bishop_attacks(occ : u64, mut blockers : u64, bishop_sq : u64) -> u64 {
+   let attacks : u64 = diag_antid_moves(bishop_sq, occ);
    blockers &= attacks;
-   return attacks ^ diag_antid_moves(bishopSq, occ ^ blockers);
+   return attacks ^ diag_antid_moves(bishop_sq, occ ^ blockers);
 }
 pub fn possibility_wp(wpawn : u64, empty : u64, black : u64) -> u64 {
     let pmoves1 = (wpawn & !FILE_MASKS[0])<<7 & black;// & !RANK_MASK[7] ;
@@ -2118,7 +2108,7 @@ pub fn get_legal_move(side_w : bool, game : &Game) -> VecDeque<(u64, Piece)> {
     legal_moves
 }
 
-pub fn print_custum_move(a_move : (u64,Piece)) {
+pub fn _print_custum_move(a_move : (u64,Piece)) {
     let a = a_move.0>>9;
     let b = (a_move.0 & 510)>>1;
     if a_move.0 & 1 == 1 {
@@ -2128,7 +2118,7 @@ pub fn print_custum_move(a_move : (u64,Piece)) {
         println!("{}{} {:?}", convert_square_to_move(a), convert_square_to_move(b), a_move.1);
     }
 }
-pub fn print_custum_move2(a_move : u64) {
+pub fn _print_custum_move2(a_move : u64) {
     let a = a_move>>9;
     let b = (a_move & 510)>>1;
     if a_move & 1 == 1 {

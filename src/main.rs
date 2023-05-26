@@ -5,13 +5,13 @@ use zobrist::*;
 
 fn main() {
     //let game = Game::default();
-    let fen = "position fen 2k4p/7p/7p/N6p/P4N1p/P6p/N6p/3K4 b - - 0 1";
+    let fen = "position fen 8/k5P1/8/8/8/8/8/1K6 w - - 0 1";
     let game = get_bitboard_from_fen(fen.trim().split_ascii_whitespace().collect());
     //let a = get_pinned_mask_b(&game);
     //let  a = get_pinned_b(&game);
     //let a = get_checked_mask_b(&game);
     for movto in get_legal_moves_fast(&game) {
-        print_custum_move2(movto);
+        _print_custum_move2(movto);
     }
     //_draw_bitboard(a);
 }
