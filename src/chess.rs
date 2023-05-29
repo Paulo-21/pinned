@@ -89,7 +89,21 @@ pub fn convert_square_to_move(a_move : u64) -> String {
     a.push((48 + b+1 ) as char );
     a
 }
-
+pub static mvv_lva : [[u64;12];12] = [
+ 	[105, 205, 305, 405, 505, 605,  105, 205, 305, 405, 505, 605],
+	[104, 204, 304, 404, 504, 604,  104, 204, 304, 404, 504, 604],
+	[103, 203, 303, 403, 503, 603,  103, 203, 303, 403, 503, 603],
+	[102, 202, 302, 402, 502, 602,  102, 202, 302, 402, 502, 602],
+	[101, 201, 301, 401, 501, 601,  101, 201, 301, 401, 501, 601],
+	[100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600],
+    
+	[105, 205, 305, 405, 505, 605,  105, 205, 305, 405, 505, 605],
+	[104, 204, 304, 404, 504, 604,  104, 204, 304, 404, 504, 604],
+	[103, 203, 303, 403, 503, 603,  103, 203, 303, 403, 503, 603],
+	[102, 202, 302, 402, 502, 602,  102, 202, 302, 402, 502, 602],
+	[101, 201, 301, 401, 501, 601,  101, 201, 301, 401, 501, 601],
+	[100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600]
+];
 pub static RANK_MASK : [u64;8] = [
     0x00000000000000FF,
     0x000000000000FF00,
@@ -176,6 +190,12 @@ lazy_static! {
         rec
     };
     
+}
+
+struct Move {
+    a : u8,
+    b : u8,
+    score : u32
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -324,6 +344,26 @@ pub fn convert_string_to_bitboard(binary:usize) -> u64 {
     //u64::pow(2, (binary) as u32)
     1<<binary
 }
+#[inline(always)]
+pub fn get_score_move (attacker : usize, victim : usize) -> u64 {
+    //print!("{} {} , ", attacker, victim);
+    mvv_lva[attacker-1][victim-1]
+}
+
+pub fn sort_move(moves : &mut Vec<u64>, mut score : Vec<u64>) {
+    for i in 1..score.len() {
+        let mut j = i;
+        while j > 0 && score[j] > score[j - 1] {
+            let temp = score[j];
+            score[j] = score[j-1];
+            score[j-1] = temp;
+            let temp = moves[j];
+            moves[j] = moves[j-1];
+            moves[j-1] = temp;
+            j = j - 1;
+        }
+    }
+}   
 pub fn _get_pinned_b(game : &Game) -> u64 {
     let occupied_bb = game.occupied();
     let own_pieces = game.black();
@@ -799,8 +839,9 @@ pub fn get_legal_moves_fast(game : &Game) -> Vec<u64>{
     }
     legal_moves
 }
-pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
-    let mut capture = Vec::with_capacity(20);
+pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>, Vec<u64>) {
+    let mut capture = Vec::with_capacity(10);
+    let mut score = Vec::with_capacity(10);
     let mut legal_moves = Vec::with_capacity(30);
     let white = game.white();
     let black = game.black();
@@ -818,14 +859,24 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
         
         while p_at != 0 {
             let pi_square = p_at.tzcnt();
-            let piece = 1<<pi_square;
-            capture.push((pi_square <<9) | (((pi_square+7)<<1)) | (((piece)&RANK_MASK[6]) != 0) as u64);
+            let piece = 1<<(pi_square+7);
+            
+            capture.push((pi_square <<9) | (((pi_square+7)<<1)) | (((1<<pi_square)&RANK_MASK[6]) != 0) as u64);
+            let victim = ((piece & game.bp)!= 0) as u64 * 1 + (piece & game.bn != 0) as u64 * 2 
+            + (piece & game.bb != 0) as u64 * 3 + (piece & game.br != 0) as u64 * 4 
+            + (piece & game.bq != 0) as u64 *5 + (piece & game.bk != 0) as u64 *6;
+            
+            score.push(get_score_move(1, victim as usize));
             p_at = p_at.blsr();
         }
         while p_at2 != 0 {
             let pi_square = p_at2.tzcnt();
-            let piece = 1<<pi_square;
-            capture.push((pi_square <<9) | ((pi_square+9)<<1)  | (((piece)&RANK_MASK[6]) != 0) as u64);
+            let piece = 1<<(pi_square+9);
+            let victim = ((piece & game.bp)!= 0) as u64 * 1 + (piece & game.bn != 0) as u64 * 2 
+            + (piece & game.bb != 0) as u64 * 3 + (piece & game.br != 0) as u64 * 4 
+            + (piece & game.bq != 0) as u64 *5 + (piece & game.bk != 0) as u64 *6;
+            score.push(get_score_move(1, victim as usize));
+            capture.push((pi_square <<9) | ((pi_square+9)<<1)  | (((1<<pi_square)&RANK_MASK[6]) != 0) as u64);
             p_at2 = p_at2.blsr();
         }
         while p_at3 != 0 {
@@ -847,7 +898,13 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
             let mut att = KNIGHT_MOVE[copy.tzcnt() as usize] & !white & checkmask;
             while att != 0 {
                 let b = att.tzcnt();
+                let piece = 1<<b;
                 if 1<<b & black != 0 {
+                    let victim = ((piece & game.bp)!= 0) as u64 * 1 + (piece & game.bn != 0) as u64 * 2 
+                    + (piece & game.bb != 0) as u64 * 3 + (piece & game.br != 0) as u64 * 4 
+                    + (piece & game.bq != 0) as u64 *5 + (piece & game.bk != 0) as u64 *6;
+                    
+                    score.push(get_score_move(2, victim as usize));
                     capture.push((copy.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -862,9 +919,15 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
         let mut p1 = game.wb & pin_d12;
         while p != 0 {
             let mut att = diag_antid_moves(p.tzcnt(), occupied) & !white & checkmask;
+            
             while att != 0 {
                 let b = att.tzcnt();
+                let piece = 1<<b;
                 if 1<<b & black != 0 {
+                    let victim = ((piece & game.bp)!= 0) as u64 * 1 + (piece & game.bn != 0) as u64 * 2 
+                    + (piece & game.bb != 0) as u64 * 3 + (piece & game.br != 0) as u64 * 4 
+                    + (piece & game.bq != 0) as u64 *5 + (piece & game.bk != 0) as u64 *6;
+                    score.push(get_score_move(3, victim as usize));
                     capture.push((p.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -876,9 +939,15 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
         }
         while p1 != 0 {
             let mut att = diag_antid_moves(p1.tzcnt(), occupied) & !white & checkmask & pin_d12;
+            
             while att != 0 {
                 let b = att.tzcnt();
+                let piece = 1<<b;
                 if 1<<b & black != 0 {
+                    let victim = ((piece & game.bp)!= 0) as u64 * 1 + (piece & game.bn != 0) as u64 * 2 
+                    + (piece & game.bb != 0) as u64 * 3 + (piece & game.br != 0) as u64 * 4 
+                    + (piece & game.bq != 0) as u64 *5 + (piece & game.bk != 0) as u64 *6;
+                    score.push(get_score_move(3, victim as usize));
                     capture.push((p1.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -893,9 +962,15 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
         let mut p1 = game.wr & pin_hv;
         while p != 0 {
             let mut att = hv_moves(p.tzcnt(), occupied) & !white & checkmask;
+            
             while att != 0 {
                 let b = att.tzcnt();
+                let piece = 1<<b;
                 if 1<<b & black != 0 {
+                    let victim = ((piece & game.bp)!= 0) as u64 * 1 + (piece & game.bn != 0) as u64 * 2 
+                    + (piece & game.bb != 0) as u64 * 3 + (piece & game.br != 0) as u64 * 4 
+                    + (piece & game.bq != 0) as u64 *5 + (piece & game.bk != 0) as u64 *6;
+                    score.push(get_score_move(4, victim as usize));
                     capture.push((p.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -907,9 +982,15 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
         }
         while p1 != 0 {
             let mut att = hv_moves(p1.tzcnt(), occupied) & !white & checkmask & pin_hv;
+            
             while att != 0 {
                 let b = att.tzcnt();
+                let piece = 1<<b;
                 if 1<<b & black != 0 {
+                    let victim = ((piece & game.bp)!= 0) as u64 * 1 + (piece & game.bn != 0) as u64 * 2 
+                    + (piece & game.bb != 0) as u64 * 3 + (piece & game.br != 0) as u64 * 4 
+                    + (piece & game.bq != 0) as u64 *5 + (piece & game.bk != 0) as u64 *6;
+                    score.push(get_score_move(4, victim as usize));
                     capture.push((p1.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -925,9 +1006,15 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
         let mut p2 = game.wq & pin_d12;
         while p != 0 {
             let mut att = (hv_moves(p.tzcnt(), occupied) | diag_antid_moves(p.tzcnt(), occupied)) & !white & checkmask;
+            
             while att != 0 {
                 let b = att.tzcnt();
+                let piece = 1<<b;
                 if 1<<b & black != 0 {
+                    let victim = ((piece & game.bp)!= 0) as u64 * 1 + (piece & game.bn != 0) as u64 * 2 
+                    + (piece & game.bb != 0) as u64 * 3 + (piece & game.br != 0) as u64 * 4 
+                    + (piece & game.bq != 0) as u64 *5 + (piece & game.bk != 0) as u64 *6;
+                    score.push(get_score_move(5, victim as usize));
                     capture.push((p.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -939,9 +1026,15 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
         }
         while p1 != 0 {
             let mut att = hv_moves(p1.tzcnt(), occupied) & !white & checkmask & pin_hv;
+            
             while att != 0 {
                 let b = att.tzcnt();
+                let piece = 1<<b;
                 if 1<<b & black != 0 {
+                    let victim = ((piece & game.bp)!= 0) as u64 * 1 + (piece & game.bn != 0) as u64 * 2 
+                    + (piece & game.bb != 0) as u64 * 3 + (piece & game.br != 0) as u64 * 4 
+                    + (piece & game.bq != 0) as u64 *5 + (piece & game.bk != 0) as u64 *6;
+                    score.push(get_score_move(5, victim as usize));
                     capture.push((p1.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -953,9 +1046,15 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
         }
         while p2 != 0 {
             let mut att = diag_antid_moves(p2.tzcnt(), occupied) & !white & checkmask & pin_d12;
+            
             while att != 0 {
                 let b  = att.tzcnt();
+                let piece = 1<<b;
                 if 1<<b & black != 0 {
+                    let victim = ((piece & game.bp)!= 0) as u64 * 1 + (piece & game.bn != 0) as u64 * 2 
+                    + (piece & game.bb != 0) as u64 * 3 + (piece & game.br != 0) as u64 * 4 
+                    + (piece & game.bq != 0) as u64 *5 + (piece & game.bk != 0) as u64 *6;
+                    score.push(get_score_move(8, victim as usize));
                     capture.push((p2.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -966,11 +1065,17 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
             p2 = p2.blsr();
         }
         //KING
-        let possib = possibility_b(game);
-        let mut p = KING_MOVE[game.wk.tzcnt() as usize] & !possib & !white & checkmask;// & !pin_hv & !pin_d12;
+        let attack_b = attack_b(game);
+        let mut p = KING_MOVE[game.wk.tzcnt() as usize] & !attack_b & !white;// & !pin_hv & !pin_d12;
+        
         while p != 0 {
             let b = p.tzcnt();
+            let piece = 1<<b;
             if 1<<b & black != 0 {
+                let victim = ((piece & game.bp)!= 0) as u64 * 1 + (piece & game.bn != 0) as u64 * 2 
+                    + (piece & game.bb != 0) as u64 * 3 + (piece & game.br != 0) as u64 * 4 
+                    + (piece & game.bq != 0) as u64 *5 + (piece & game.bk != 0) as u64 *6;
+                score.push(get_score_move(6, victim as usize));
                 capture.push((game.wk.tzcnt() <<9) + (p.tzcnt()<<1) );
             }
             else {
@@ -978,10 +1083,10 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
             }
             p = p.blsr();
         }
-        if game.wqueen_castle && occupied & (2u64.pow(3) + 2u64.pow(2) + 2u64.pow(1)) == 0 && possib & (2u64.pow(3) + 2u64.pow(2) + 2u64.pow(4)) == 0 {
+        if game.wqueen_castle && occupied & (2u64.pow(3) + 2u64.pow(2) + 2u64.pow(1)) == 0 && attack_b & (2u64.pow(3) + 2u64.pow(2) + 2u64.pow(4)) == 0 {
             legal_moves.push((4<<9)+(2<<1));
         }
-        if game.wking_castle && occupied & (2u64.pow(6) + 2u64.pow(5)) == 0 && possib & (2u64.pow(6) + 2u64.pow(5) + 2u64.pow(4)) == 0 {
+        if game.wking_castle && occupied & (2u64.pow(6) + 2u64.pow(5)) == 0 && attack_b & (2u64.pow(6) + 2u64.pow(5) + 2u64.pow(4)) == 0 {
             legal_moves.push((4<<9)+(6<<1));
         }
         
@@ -999,11 +1104,21 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
         
         while p_at != 0 {
             let pi_square = p_at.tzcnt();
+            let piece = 1<<(pi_square-7);
+            let victim = ((piece & game.wp)!= 0) as u64 * 1 + (piece & game.wn != 0) as u64 * 2 
+            + (piece & game.wb != 0) as u64 * 3 + (piece & game.wr != 0) as u64 * 4 
+            + (piece & game.wq != 0) as u64 * 5 + (piece & game.wk != 0) as u64 *6;
+            score.push(get_score_move(1, victim as usize));
             capture.push((pi_square <<9) + ((pi_square-7)<<1) | (((1<<pi_square)&RANK_MASK[1]) != 0) as u64);
             p_at = p_at.blsr();
         }
         while p_at2 != 0 {
             let pi_square = p_at2.tzcnt();
+            let piece = 1<<(pi_square-9);
+            let victim = ((piece & game.wp)!= 0) as u64 * 1 + (piece & game.wn != 0) as u64 * 2 
+            + (piece & game.wb != 0) as u64 * 3 + (piece & game.wr != 0) as u64 * 4 
+            + (piece & game.wq != 0) as u64 * 5 + (piece & game.wk != 0) as u64 * 6;
+            score.push(get_score_move(1, victim as usize));
             capture.push((pi_square <<9) + ((pi_square-9)<<1) | (((1<<pi_square)&RANK_MASK[1]) != 0) as u64);
             p_at2 = p_at2.blsr();
         }
@@ -1024,7 +1139,12 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
             let mut att = KNIGHT_MOVE[copy.tzcnt() as usize] & !black & checkmask;
             while att != 0 {
                 let b = att.tzcnt();
+                let piece = 1<<b;
                 if 1<<b & white !=0  {
+                    let victim = ((piece & game.wp)!= 0) as u64 * 1 + (piece & game.wn != 0) as u64 * 2 
+                    + (piece & game.wb != 0) as u64 * 3 + (piece & game.wr != 0) as u64 * 4 
+                    + (piece & game.wq != 0) as u64 *5 + (piece & game.wk != 0) as u64 *6;
+                    score.push(get_score_move(2, victim as usize));
                     capture.push((copy.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -1042,7 +1162,12 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
             let mut att = diag_antid_moves(p.tzcnt(), occupied) & !black & checkmask;
             while att != 0 {
                 let b = att.tzcnt();
-                if 1<<b & white != 0 {
+                let piece = 1<<b;
+                if 1<<b & white !=0  {
+                    let victim = ((piece & game.wp)!= 0) as u64 * 1 + (piece & game.wn != 0) as u64 * 2 
+                    + (piece & game.wb != 0) as u64 * 3 + (piece & game.wr != 0) as u64 * 4 
+                    + (piece & game.wq != 0) as u64 *5 + (piece & game.wk != 0) as u64 *6;
+                    score.push(get_score_move(3, victim as usize));
                     capture.push((p.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -1056,7 +1181,12 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
             let mut att = diag_antid_moves(p1.tzcnt(), occupied) & !black & checkmask & pin_d12;
             while att != 0 {
                 let b = att.tzcnt();
-                if 1<<b & white != 0{
+                let piece = 1<<b;
+                if 1<<b & white !=0  {
+                    let victim = ((piece & game.wp)!= 0) as u64 * 1 + (piece & game.wn != 0) as u64 * 2 
+                    + (piece & game.wb != 0) as u64 * 3 + (piece & game.wr != 0) as u64 * 4 
+                    + (piece & game.wq != 0) as u64 *5 + (piece & game.wk != 0) as u64 *6;
+                    score.push(get_score_move(3, victim as usize));
                     capture.push((p1.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -1073,7 +1203,12 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
             let mut att = hv_moves(p.tzcnt(), occupied) & !black & checkmask;
             while att != 0 {
                 let b = att.tzcnt();
-                if 1<<b & white != 0 {
+                let piece = 1<<b;
+                if 1<<b & white !=0  {
+                    let victim = ((piece & game.wp)!= 0) as u64 * 1 + (piece & game.wn != 0) as u64 * 2 
+                    + (piece & game.wb != 0) as u64 * 3 + (piece & game.wr != 0) as u64 * 4 
+                    + (piece & game.wq != 0) as u64 *5 + (piece & game.wk != 0) as u64 *6;
+                    score.push(get_score_move(4, victim as usize));
                     capture.push((p.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -1087,7 +1222,12 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
             let mut att = hv_moves(p1.tzcnt(), occupied) & !black & checkmask & pin_hv;
             while att != 0 {
                 let b = att.tzcnt();
-                if 1<<b & white != 0 {
+                let piece = 1<<b;
+                if 1<<b & white !=0  {
+                    let victim = ((piece & game.wp)!= 0) as u64 * 1 + (piece & game.wn != 0) as u64 * 2 
+                    + (piece & game.wb != 0) as u64 * 3 + (piece & game.wr != 0) as u64 * 4 
+                    + (piece & game.wq != 0) as u64 *5 + (piece & game.wk != 0) as u64 *6;
+                    score.push(get_score_move(4, victim as usize));
                     capture.push((p1.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -1105,7 +1245,12 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
             let mut att = (hv_moves(p.tzcnt(), occupied) | diag_antid_moves(p.tzcnt(), occupied)) & !black & checkmask;
             while att != 0 {
                 let b = att.tzcnt();
-                if 1<<b & white != 0 {
+                let piece = 1<<b;
+                if 1<<b & white !=0  {
+                    let victim = ((piece & game.wp)!= 0) as u64 * 1 + (piece & game.wn != 0) as u64 * 2 
+                    + (piece & game.wb != 0) as u64 * 3 + (piece & game.wr != 0) as u64 * 4 
+                    + (piece & game.wq != 0) as u64 *5 + (piece & game.wk != 0) as u64 *6;
+                    score.push(get_score_move(5, victim as usize));
                     capture.push((p.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -1119,7 +1264,12 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
             let mut att = hv_moves(p1.tzcnt(), occupied) & checkmask & pin_hv & !black;
             while att != 0 {
                 let b = att.tzcnt();
-                if 1<<b & white != 0 {
+                let piece = 1<<b;
+                if 1<<b & white !=0  {
+                    let victim = ((piece & game.wp)!= 0) as u64 * 1 + (piece & game.wn != 0) as u64 * 2 
+                    + (piece & game.wb != 0) as u64 * 3 + (piece & game.wr != 0) as u64 * 4 
+                    + (piece & game.wq != 0) as u64 *5 + (piece & game.wk != 0) as u64 *6;
+                    score.push(get_score_move(5, victim as usize));
                     capture.push((p1.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -1133,7 +1283,12 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
             let mut att = diag_antid_moves(p2.tzcnt(), occupied) & checkmask & pin_d12 & !black;
             while att != 0 {
                 let b = att.tzcnt();
-                if 1<<b & white != 0 {
+                let piece = 1<<b;
+                if 1<<b & white !=0  {
+                    let victim = ((piece & game.wp)!= 0) as u64 * 1 + (piece & game.wn != 0) as u64 * 2 
+                    + (piece & game.wb != 0) as u64 * 3 + (piece & game.wr != 0) as u64 * 4 
+                    + (piece & game.wq != 0) as u64 *5 + (piece & game.wk != 0) as u64 *6;
+                    score.push(get_score_move(5, victim as usize)); 
                     capture.push((p2.tzcnt() <<9) + (b<<1) );
                 }
                 else {
@@ -1144,11 +1299,16 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
             p2 = p2.blsr();
         }
         //KING
-        let possiw = possibility_w(game);
-        let mut p = KING_MOVE[game.bk.tzcnt() as usize] & !possiw & !black & checkmask;
+        let attack_w = attack_w(game);
+        let mut p = KING_MOVE[game.bk.tzcnt() as usize] & !attack_w & !black;
         while p != 0 {
             let b = p.tzcnt();
-            if 1<<b & white != 0 {
+            let piece = 1<<b;
+            if 1<<b & white !=0  {
+                let victim = ((piece & game.wp)!= 0) as u64 * 1 + (piece & game.wn != 0) as u64 * 2 
+                + (piece & game.wb != 0) as u64 * 3 + (piece & game.wr != 0) as u64 * 4 
+                + (piece & game.wq != 0) as u64 *5 + (piece & game.wk != 0) as u64 *6;
+                score.push(get_score_move(6, victim as usize));
                 capture.push((game.bk.tzcnt() <<9) + (b<<1) );
             }
             else {
@@ -1156,14 +1316,14 @@ pub fn get_legal_moves_fast_c(game : &Game) -> (Vec<u64>,Vec<u64>) {
             }
             p = p.blsr();
         }
-        if game.bqueen_castle && occupied & (2u64.pow(58) + 2u64.pow(59) + 2u64.pow(57)) == 0 && possiw & (2u64.pow(58) + 2u64.pow(59) + 2u64.pow(60)) == 0 {
+        if game.bqueen_castle && occupied & (2u64.pow(58) + 2u64.pow(59) + 2u64.pow(57)) == 0 && attack_w & (2u64.pow(58) + 2u64.pow(59) + 2u64.pow(60)) == 0 {
             legal_moves.push((60<<9) + (58<<1));
         }
-        if game.bking_castle && occupied & (2u64.pow(61) + 2u64.pow(62)) == 0 && possiw & (2u64.pow(61) + 2u64.pow(62) + 2u64.pow(60)) == 0 {
+        if game.bking_castle && occupied & (2u64.pow(61) + 2u64.pow(62)) == 0 && attack_w & (2u64.pow(61) + 2u64.pow(62) + 2u64.pow(60)) == 0 {
             legal_moves.push((60<<9) + (62<<1));
         }
     }
-    (capture, legal_moves)
+    (capture, legal_moves, score)
 }
 
 fn xray_rook_attacks(occ : u64, mut blockers : u64, rook_sq : u64) -> u64 {

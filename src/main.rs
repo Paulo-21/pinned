@@ -5,14 +5,36 @@ use zobrist::*;
 
 fn main() {
     //let game = Game::default();
-    let fen = "position fen r3kb1r/pppb1ppp/2nqpn2/1B4Q1/3P4/2N2N2/PPP2PPP/R1B1K2R b KQkq - 2 9";
+    let fen = "position fen 8/3k2pp/8/8/8/8/5r2/2K5 w - - 21 84";
     let game = get_bitboard_from_fen(fen.trim().split_ascii_whitespace().collect());
     //let a = get_pinned_mask_b(&game);
     //let  a = get_pinned_b(&game);
     //let a = get_checked_mask_b(&game);
-    for movto in get_legal_moves_fast(&game) {
+    let (mut capture, quiet, score_move) = get_legal_moves_fast_c(&game);
+    println!("Capture");
+    for movto in &capture {
+        _print_custum_move2(*movto);
+    }
+    println!("SCORE");
+    for movto in &score_move {
+        print!("{} ", movto);
+    }
+    sort_move(&mut capture, score_move);
+    println!("Capture");
+    for movto in capture {
         _print_custum_move2(movto);
     }
+    /*println!("SCORE");
+    for movto in score_move {
+        print!("{}", movto);
+    }*/
+
+    
+    println!("\nQUIET");
+    for movto in quiet {
+        _print_custum_move2(movto);
+    }
+    
     //_draw_bitboard(a);
 }
 pub fn get_bitboard_from_fen(fen : Vec<&str>) -> Game {
