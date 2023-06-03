@@ -458,9 +458,9 @@ pub fn get_checked_mask_b(game : &Game) -> u64 {
     let mut pawns = game.wp;
     while pawns != 0 {
         let p = pawns.tzcnt();
-        let m = attack_wp(p, black);
+        let m = attack_wp(1<<p, black);
         if m & k != 0 {
-            checked_mask &= p;
+            checked_mask &= 1<<p;
         }
         pawns = pawns.blsr();
     }
@@ -521,9 +521,9 @@ pub fn get_checked_mask_w(game : &Game) -> u64 {
     let mut pawns = game.bp;
     while pawns != 0 {
         let p = pawns.tzcnt();
-        let m = attack_bp(p, white);
+        let m = attack_bp(1<<p, white);
         if m & k != 0 {
-            checked_mask &= p;
+            checked_mask &= 1<<p;
         }
         pawns = pawns.blsr();
     }
@@ -1371,13 +1371,13 @@ pub fn possibility_bp2( bpawn: u64, empty : u64, white : u64) -> u64 {
     pmoves1 | pmoves2 | pmoves3 | pmoves4
 }
 pub fn attack_wp(wpawn : u64, black : u64) -> u64 {
-    let pmoves1 = wpawn<<7 & black;// & !FILE_MASKS[0];
-    let pmoves2 = wpawn<<9 & black;// & !FILE_MASKS[7];
+    let pmoves1 = wpawn<<7;// & black;// & !FILE_MASKS[0];
+    let pmoves2 = wpawn<<9;// & black;// & !FILE_MASKS[7];
     pmoves1 | pmoves2
 }
 pub fn attack_bp(bpawn : u64, black : u64) -> u64 {
-    let pmoves1 = bpawn>>7 & black;// & !FILE_MASKS[0];
-    let pmoves2 = bpawn>>9 & black;// & !FILE_MASKS[7];
+    let pmoves1 = bpawn>>7;// & black;// & !FILE_MASKS[0];
+    let pmoves2 = bpawn>>9;// & black;// & !FILE_MASKS[7];
     pmoves1 | pmoves2
 }
 pub fn possibility_n(knight : u64) -> u64 {

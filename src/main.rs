@@ -5,43 +5,20 @@ use zobrist::*;
 
 fn main() {
     //let game = Game::default();
-    let fen = "position fen rnbqkbnr/p1p1pppp/8/1p1p4/Q7/P1P5/1P1PPPPP/RNB1KBNR b KQkq - 0 1";
+    let fen = "position fen rnbq1bnr/pppkpppp/2P5/3p4/8/8/PP1PPPPP/RNBQKBNR b KQha - 0 1";
     //let fen = "position fen 8/3k2pp/8/8/8/8/5r2/2K5 w - - 21 84";
     let mut game = get_bitboard_from_fen(fen.trim().split_ascii_whitespace().collect());
-    
-    /*let playmove = convert_move_to_bitboard("g2g4");
-    compute_move_w_thrust(playmove, &mut game);
-    game.white_to_play^=true;
-    _draw_bitboard(game.en_passant);
-    let playmove = convert_move_to_bitboard("h4g3");
-    compute_move_b_thrust(playmove, &mut game);
-    game.white_to_play^=true;
-    _draw_bitboard(game.en_passant);*/
+    let c = get_checked_mask_b(&game);
+    _draw_bitboard(c);
 
     //let (mut capture, quiet, score_move) = get_legal_moves_fast_c(&mut game);
     let moves = get_legal_moves_fast(&mut game);
-    _draw_bitboard(game.en_passant);
-    println!("Capture");
-    /*for movto in &capture {
-        _print_custum_move2(*movto);
-    }
-    println!("SCORE");
-    for movto in &score_move {
-        print!("{} ", movto);
-    }
-    sort_move(&mut capture, score_move);
-    println!("Capture");
-    for movto in capture {
-        _print_custum_move2(movto);
-    }
-    
-*/  
+
     println!("\nQUIET");
     for movto in moves {
         _print_custum_move2(movto);
     }
     
-    _draw_board(&game);
 }
 pub fn get_bitboard_from_fen(fen : Vec<&str>) -> Game {
     let mut game = Game::empty();
