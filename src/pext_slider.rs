@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 pub const SLIDING_MOVE_TABLE_SIZE: usize = INDEX_DATA.table_size;
 
 use crate::chess::*;
-lazy_static!{
+lazy_static! {
     pub static ref TABLE_SLIDING : [u64; SLIDING_MOVE_TABLE_SIZE] = {
         let mut table = [0u64; SLIDING_MOVE_TABLE_SIZE];
         println!("{}", SLIDING_MOVE_TABLE_SIZE);
@@ -123,7 +123,6 @@ pub fn get_bishop_moves_index(square: u64, blockers: u64) -> usize {
     get_pext_index(&INDEX_DATA.bishop_data, square, blockers)
 }
 
-
 pub const fn get_rook_relevant_blockers(square: u64) -> u64 {
     let rank_moves = (1<<rank(square)) & !(FILE_MASKSC[0] | FILE_MASKSC[7]);
     let file_moves = (1<<file(square)) & !(RANK_MASKC[0] | RANK_MASKC[7]);
@@ -161,7 +160,7 @@ fn write_moves(
     table_index: impl Fn(u64, u64) -> usize,
     slider_moves: impl Fn(u64, u64) -> u64
 ) {
-    for square in 1..64 {
+    for square in 0..64 {
         let mask = relevant_blockers(square);
         let d = mask;
             let mut n : u64 = 0;

@@ -13,9 +13,6 @@ fn main() {
     
     let hv = TABLE_SLIDING[get_rook_moves_index(game.wr.tzcnt(), game.occupied())];
     //let hv = hv_moves(game.wr.tzcnt(), game.occupied());
-    println!("PEXT {}", pext_u64(43, game.occupied()));
-    _draw_bitboard(game.occupied());
-    _draw_bitboard(hv as u64);
     
     /*let c = get_checked_mask_b(&game);
     _draw_bitboard(c);

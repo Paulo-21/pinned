@@ -11,6 +11,10 @@ lazy_static = "1.4.0"
 rand = "0.8.5"
 rand_xorshift = "0.3.0"
 
+
+#[build]
+#rustflags = ["-C", "target-cpu=native"]
+
 [profile.release]
 lto = true
 codegen-units = 1
