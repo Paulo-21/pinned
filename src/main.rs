@@ -1,14 +1,23 @@
 mod chess;
 mod zobrist;
+mod pext_slider;
+use bitintr::Tzcnt;
 use chess::*;
 use zobrist::*;
-
+use pext_slider::*;
 fn main() {
     //let game = Game::default();
-    let fen = "position fen rnbq1bnr/pppkpppp/2P5/3p4/8/8/PP1PPPPP/RNBQKBNR b KQha - 0 1";
+    let fen = "position fen rnbqkbnr/1pppppp1/8/p6p/P6P/8/1PPPPPP1/RNBQKBNR w KQkq - 0 1";
     //let fen = "position fen 8/3k2pp/8/8/8/8/5r2/2K5 w - - 21 84";
-    let mut game = get_bitboard_from_fen(fen.trim().split_ascii_whitespace().collect());
-    let c = get_checked_mask_b(&game);
+    let game = get_bitboard_from_fen(fen.trim().split_ascii_whitespace().collect());
+    
+    let hv = TABLE_SLIDING[get_rook_moves_index(game.wr.tzcnt(), game.occupied())];
+    //let hv = hv_moves(game.wr.tzcnt(), game.occupied());
+    println!("PEXT {}", pext_u64(43, game.occupied()));
+    _draw_bitboard(game.occupied());
+    _draw_bitboard(hv as u64);
+    
+    /*let c = get_checked_mask_b(&game);
     _draw_bitboard(c);
 
     //let (mut capture, quiet, score_move) = get_legal_moves_fast_c(&mut game);
@@ -17,7 +26,7 @@ fn main() {
     println!("\nQUIET");
     for movto in moves {
         _print_custum_move2(movto);
-    }
+    }*/
     
 }
 pub fn get_bitboard_from_fen(fen : Vec<&str>) -> Game {

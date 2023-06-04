@@ -106,18 +106,33 @@ pub static RANK_MASK : [u64;8] = [
     0x00FF000000000000,
     0xFF00000000000000
 ];
+pub const RANK_MASKC : [u64;8] = [
+    0x00000000000000FF,
+    0x000000000000FF00,
+    0x0000000000FF0000, 
+    0x00000000FF000000,
+    0x000000FF00000000,
+    0x0000FF0000000000,
+    0x00FF000000000000,
+    0xFF00000000000000
+];
+pub const EDGES : u64 = 0b11111111_10000001_10000001_10000001_10000001_10000001_10000001_11111111;
 pub static FULL : u64 = 0xFFFFFFFFFFFFFFFF;
-static FILE_MASKS : [u64;8] = [
+pub static FILE_MASKS : [u64;8] = [
+    0x101010101010101, 0x202020202020202, 0x404040404040404, 0x808080808080808,
+    0x1010101010101010, 0x2020202020202020, 0x4040404040404040, 0x8080808080808080
+];
+pub const FILE_MASKSC : [u64;8] = [
     0x101010101010101, 0x202020202020202, 0x404040404040404, 0x808080808080808,
     0x1010101010101010, 0x2020202020202020, 0x4040404040404040, 0x8080808080808080
 ];
 
-static DIAG_MASKS : [u64;15] = [
+pub static DIAG_MASKS : [u64;15] = [
     0x1, 0x102, 0x10204, 0x1020408, 0x102040810, 0x10204081020, 0x1020408102040,
 	0x102040810204080, 0x204081020408000, 0x408102040800000, 0x810204080000000,
 	0x1020408000000000, 0x2040800000000000, 0x4080000000000000, 0x8000000000000000
 ];
-static ANTIDIAG_MASKS : [u64;15] = [
+pub static ANTIDIAG_MASKS : [u64;15] = [
     0x80, 0x8040, 0x804020, 0x80402010, 0x8040201008, 0x804020100804, 0x80402010080402,
 	0x8040201008040201, 0x4020100804020100, 0x2010080402010000, 0x1008040201000000,
 	0x804020100000000, 0x402010000000000, 0x201000000000000, 0x100000000000000
@@ -724,15 +739,14 @@ pub fn get_legal_moves_fast(game : &mut Game) -> Vec<u64> {
         game.en_passant &= !RANK_MASK[5];
         //_draw_bitboard(black);
         //PAWN
-        let unpinned_bp = game.bp & !pin_hv;
-        //game.bp & pin_d12 & (white & pin_d12)<<7  
-        let mut p_at= ((unpinned_bp & !pin_d12 & !FILE_MASKS[7])) & ((white | game.en_passant) << 7) & (checkmask << 7) |
+        let unpinned_bp = game.bp & !pin_hv &!pin_d12;
+        let mut p_at= ((unpinned_bp & !FILE_MASKS[7])) & ((white | game.en_passant) << 7) & (checkmask << 7) |
                             (game.bp & pin_d12 & (white & pin_d12)<<7 & (checkmask << 7));
-        let mut p_at2 = ((unpinned_bp & !pin_d12 & !FILE_MASKS[0])) & ((white | game.en_passant) << 9 ) & (checkmask << 9) |
+        let mut p_at2 = ((unpinned_bp & !FILE_MASKS[0])) & ((white | game.en_passant) << 9 ) & (checkmask << 9) |
                             (game.bp & pin_d12 & (white & pin_d12)<<9 & (checkmask << 9));
-        let mut p_at3 = (unpinned_bp & !pin_d12 ) & ( (empty << 16) & (empty << 8)) & RANK_MASK[6] & (checkmask <<16) |
+        let mut p_at3 = (unpinned_bp ) & ( (empty << 16) & (empty << 8)) & RANK_MASK[6] & (checkmask <<16) |
                 (game.bp & pin_hv & (empty & pin_hv)<<8 & RANK_MASK[6] & (empty & pin_hv)<<16 & (checkmask << 16));
-        let mut p_at4 = (unpinned_bp & !pin_d12) & ( (empty << 8)) & (checkmask<<8) |
+        let mut p_at4 = (unpinned_bp) & ( (empty << 8)) & (checkmask<<8) |
                 (game.bp & pin_hv & (empty & pin_hv)<<8 & (checkmask << 8));
         
         while p_at != 0 {
@@ -862,11 +876,15 @@ pub fn get_legal_moves_fast_c(game : &mut Game) -> (Vec<u64>,Vec<u64>, Vec<u64>)
         let (pin_hv, pin_d12) = get_pinned_mask_w(game);
         game.en_passant &= !RANK_MASK[2];
         //PAWN
-        let unpinned_wp = game.wp & !pin_hv;
-        let mut p_at = (unpinned_wp & !FILE_MASKS[0]) & ((black | game.en_passant) >> 7) & (checkmask >> 7);
-        let mut p_at2 = (unpinned_wp & !FILE_MASKS[7]) & ((black | game.en_passant) >> 9 ) & (checkmask >> 9);
-        let mut p_at3 = (unpinned_wp & !pin_d12) & ((empty>>8) & (empty >> 16)) & RANK_MASK[1] & (checkmask >> 16);
-        let mut p_at4 = (unpinned_wp & !pin_d12) & (empty >> 8) & (checkmask >> 8);
+        let unpinned_wp = game.wp & !pin_hv & !pin_d12;
+        let mut p_at = (unpinned_wp & !FILE_MASKS[0]) & ((black | game.en_passant) >> 7) & (checkmask >> 7) |
+                            (game.wp & pin_d12 & (black & pin_d12)>>7 & (checkmask >> 7));
+        let mut p_at2 = (unpinned_wp & !FILE_MASKS[7]) & ((black | game.en_passant) >> 9 ) & (checkmask >> 9)|
+                            (game.wp & pin_d12 & (black & pin_d12)>>9 & (checkmask >> 9));
+        let mut p_at3 = (unpinned_wp) & ((empty>>8) & (empty >> 16)) & RANK_MASK[1] & (checkmask >> 16) |
+                            (game.wp & pin_hv & (empty & pin_hv)>>8 & RANK_MASK[1] & (empty & pin_hv)>>16 & (checkmask >> 16));
+        let mut p_at4 = (unpinned_wp) & (empty >> 8) & (checkmask >> 8) |
+                            (game.wp & pin_hv & (empty & pin_hv)>>8 & (checkmask >> 8));
         
         while p_at != 0 {
             let pi_square = p_at.tzcnt();
@@ -1107,11 +1125,15 @@ pub fn get_legal_moves_fast_c(game : &mut Game) -> (Vec<u64>,Vec<u64>, Vec<u64>)
         let (pin_hv, pin_d12) = get_pinned_mask_b(game);
         game.en_passant &= !RANK_MASK[5];
         //PAWN
-        let unpinned_bp = game.bp & !pin_hv;
-        let mut p_at  = ((unpinned_bp & !FILE_MASKS[7])) & ((white | game.en_passant) << 7) & (checkmask << 7);
-        let mut p_at2 = ((unpinned_bp & !FILE_MASKS[0])) & ((white | game.en_passant) << 9 ) & (checkmask << 9);
-        let mut p_at3 = (unpinned_bp & !pin_d12 ) & ( (empty << 16)&(empty << 8)) & RANK_MASK[6] & (checkmask <<16);
-        let mut p_at4 = (unpinned_bp & !pin_d12) & ( (empty << 8)) & (checkmask<<8) ;
+        let unpinned_bp = game.bp & !pin_hv & !pin_d12;
+        let mut p_at= ((unpinned_bp & !FILE_MASKS[7])) & ((white | game.en_passant) << 7) & (checkmask << 7) |
+                            (game.bp & pin_d12 & (white & pin_d12)<<7 & (checkmask << 7));
+        let mut p_at2 = ((unpinned_bp & !FILE_MASKS[0])) & ((white | game.en_passant) << 9 ) & (checkmask << 9) |
+                            (game.bp & pin_d12 & (white & pin_d12)<<9 & (checkmask << 9));
+        let mut p_at3 = (unpinned_bp ) & ( (empty << 16) & (empty << 8)) & RANK_MASK[6] & (checkmask <<16) |
+                (game.bp & pin_hv & (empty & pin_hv)<<8 & RANK_MASK[6] & (empty & pin_hv)<<16 & (checkmask << 16));
+        let mut p_at4 = (unpinned_bp ) & ( (empty << 8)) & (checkmask<<8) |
+                (game.bp & pin_hv & (empty & pin_hv)<<8 & (checkmask << 8));
         
         while p_at != 0 {
             let pi_square = p_at.tzcnt();
@@ -1371,13 +1393,13 @@ pub fn possibility_bp2( bpawn: u64, empty : u64, white : u64) -> u64 {
     pmoves1 | pmoves2 | pmoves3 | pmoves4
 }
 pub fn attack_wp(wpawn : u64, black : u64) -> u64 {
-    let pmoves1 = wpawn<<7;// & black;// & !FILE_MASKS[0];
-    let pmoves2 = wpawn<<9;// & black;// & !FILE_MASKS[7];
+    let pmoves1 = (wpawn & !FILE_MASKS[0])<<7;// & black;// & !FILE_MASKS[0];
+    let pmoves2 = (wpawn & !FILE_MASKS[7])<<9;// & black;// & !FILE_MASKS[7];
     pmoves1 | pmoves2
 }
 pub fn attack_bp(bpawn : u64, black : u64) -> u64 {
-    let pmoves1 = bpawn>>7;// & black;// & !FILE_MASKS[0];
-    let pmoves2 = bpawn>>9;// & black;// & !FILE_MASKS[7];
+    let pmoves1 = (bpawn & !FILE_MASKS[7])>>7;// & black;// & !FILE_MASKS[0];
+    let pmoves2 = (bpawn & !FILE_MASKS[0])>>9;// & black;// & !FILE_MASKS[7];
     pmoves1 | pmoves2
 }
 pub fn possibility_n(knight : u64) -> u64 {
@@ -2247,25 +2269,22 @@ pub fn attack_w( game : &Game) -> u64 {
     let mut copy_wn = game.wn;
     while copy_wn != 0 {
         attack |= KNIGHT_MOVE[copy_wn.tzcnt() as usize];
-        copy_wn &= copy_wn-1;
+        copy_wn = copy_wn.blsr();
     }
-    /*f game.wn != 0 {
-        attack |= possibility_n(game.wn) & !white;
-    }*/
     let mut copy_wb = game.wb;
     while copy_wb != 0 {
         attack |= diag_antid_moves(copy_wb.tzcnt() , occupied);
-        copy_wb &= copy_wb-1;
+        copy_wb = copy_wb.blsr();
     }
     let mut copy_wr = game.wr;
     while copy_wr != 0 {
         attack |= hv_moves(copy_wr.tzcnt() , occupied);
-        copy_wr &= copy_wr-1;
+        copy_wr = copy_wr.blsr();
     }
     let mut copy_wq = game.wq;
     while copy_wq != 0 {
         attack |= hv_moves(copy_wq.tzcnt(), occupied) | diag_antid_moves(copy_wq.tzcnt(), occupied);
-        copy_wq &= copy_wq-1;
+        copy_wq = copy_wq.blsr();
     }
     //attack |= possibility_k(game.wk) & !white;
     attack |= KING_MOVE[game.wk.tzcnt() as usize];
@@ -2313,25 +2332,25 @@ pub fn attack_b( game : &Game) -> u64 {
     let mut attack = 0;
 
     attack |= attack_bp(game.bp, FULL);
-
-    if game.bn != 0 {
-        attack |= KNIGHT_MOVE[game.bn.tzcnt() as usize];
-        //attack |= possibility_n(game.bn) & !black;
+    let mut copy = game.bn;
+    while copy != 0 {
+        attack |= KNIGHT_MOVE[copy.tzcnt() as usize];
+        copy = copy.blsr();
     }
     let mut copy_bb = game.bb;
     while copy_bb != 0 {
         attack |= diag_antid_moves(copy_bb.tzcnt() , occupied);
-        copy_bb &= copy_bb-1;
+        copy_bb = copy_bb.blsr();
     }
     let mut copy_br = game.br;
     while copy_br != 0 {
         attack |= hv_moves(copy_br.tzcnt(), occupied);
-        copy_br &= copy_br-1;
+        copy_br = copy_br.blsr();
     }
     let mut copy_bq = game.bq;
     while copy_bq != 0 {
         attack |= hv_moves(copy_bq.tzcnt(), occupied) | diag_antid_moves(copy_bq.tzcnt(), occupied) ;
-        copy_bq &= copy_bq-1;
+        copy_bq = copy_bq.blsr();
     }
     attack |= KING_MOVE[game.bk.tzcnt() as usize];
     //attack |= possibility_k(game.bk) & !black;
